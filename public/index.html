@@ -1,72 +1,326 @@
 <!doctype html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Mi sitio</title>
-  <style>
-    body { font-family: Arial; margin: 0; }
-    .container { max-width: 1000px; margin: 0 auto; padding: 16px; }
-    .banner { padding: 48px 16px; background:#f3f3f3; }
-    .cards { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px; }
-    .card { padding: 16px; border:1px solid #ddd; border-radius: 12px; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+
+<body class="bg-slate-950 text-slate-100">
   <div id="app"></div>
 
   <script>
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+
+    const alignClass = (align) => {
+      if (align === "center") return "text-center items-center";
+      if (align === "right") return "text-right items-end";
+      return "text-left items-start";
+    };
+
+    const btnClass = (variant) => {
+      if (variant === "ghost") {
+        return "px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 hover:bg-white/5 transition";
+      }
+      return "px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-medium transition shadow shadow-indigo-500/20";
+    };
+
+    const cardWrapClass = (style) => {
+      if (style === "outline") return "border border-white/15 bg-transparent";
+      if (style === "glass") return "border border-white/15 bg-white/5 backdrop-blur-xl";
+      return "border border-white/10 bg-white/5 shadow-xl shadow-black/30"; // elevated
+    };
+
+    function renderButtons(buttons = []) {
+      if (!buttons.length) return "";
+      return `
+        <div class="flex flex-wrap gap-3 mt-6">
+          ${buttons.map(b => {
+            const target = b.newTab ? ` target="_blank" rel="noopener noreferrer"` : "";
+            return `<a href="${esc(b.href || "#")}" class="${btnClass(b.variant)}"${target}>${esc(b.label || "Botón")}</a>`;
+          }).join("")}
+        </div>
+      `;
+    }
+
     const renderers = {
-      banner: (props) => `
-        <section class="banner">
-          <div class="container">
-            <h1>${escapeHtml(props.title || "")}</h1>
-            <p>${escapeHtml(props.subtitle || "")}</p>
-          </div>
-        </section>
-      `,
-      cards: (props) => {
-        const items = props.items || [];
-        return `
-          <section class="container">
-            <div class="cards">
-              ${items.map(i => `
-                <div class="card">
-                  <h3>${escapeHtml(i.title || "")}</h3>
-                  <p>${escapeHtml(i.text || "")}</p>
+      bannerPro: (p) => {
+        const a = alignClass(p.align);
+        const hasImg = !!p.showImage && !!p.imageUrl;
+
+        if (hasImg) {
+          return `
+            <section class="relative overflow-hidden">
+              <div class="absolute inset-0">
+                <img src="${esc(p.imageUrl)}" alt="${esc(p.imageAlt || "Banner")}" class="h-full w-full object-cover opacity-90" />
+                ${p.overlay ? `<div class="absolute inset-0 bg-slate-950/60"></div>` : ""}
+              </div>
+              <div class="relative max-w-6xl mx-auto px-6 py-16 md:py-24">
+                <div class="max-w-2xl flex flex-col gap-3 ${a}">
+                  ${p.showTitle ? `<h1 class="text-4xl md:text-6xl font-bold tracking-tight">${esc(p.title)}</h1>` : ""}
+                  ${p.showSubtitle ? `<p class="text-slate-200/90 text-lg md:text-xl">${esc(p.subtitle)}</p>` : ""}
+                  ${p.showButtons ? renderButtons(p.buttons || []) : ""}
                 </div>
-              `).join("")}
+              </div>
+            </section>
+          `;
+        }
+
+        return `
+          <section class="relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-indigo-600/30 via-slate-950 to-fuchsia-600/20"></div>
+            <div class="relative max-w-6xl mx-auto px-6 py-16 md:py-24">
+              <div class="max-w-2xl flex flex-col gap-3 ${a}">
+                ${p.showTitle ? `<h1 class="text-4xl md:text-6xl font-bold tracking-tight">${esc(p.title)}</h1>` : ""}
+                ${p.showSubtitle ? `<p class="text-slate-200/90 text-lg md:text-xl">${esc(p.subtitle)}</p>` : ""}
+                ${p.showButtons ? renderButtons(p.buttons || []) : ""}
+              </div>
             </div>
           </section>
         `;
-      }
+      },
+
+      cardsGridPro: (p) => {
+        const cols =
+          p.columns === "1" ? "grid-cols-1" :
+          p.columns === "2" ? "grid-cols-1 md:grid-cols-2" :
+          p.columns === "4" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" :
+          "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+
+        const sectionId = p.sectionId ? `id="${esc(p.sectionId)}"` : "";
+
+        const items = Array.isArray(p.items) ? p.items : [];
+        return `
+          <section ${sectionId} class="max-w-6xl mx-auto px-6 py-12">
+            <div class="flex flex-col gap-2">
+              ${p.heading ? `<h2 class="text-3xl font-bold tracking-tight">${esc(p.heading)}</h2>` : ""}
+              ${p.subheading ? `<p class="text-slate-300 max-w-2xl">${esc(p.subheading)}</p>` : ""}
+            </div>
+
+            <div class="mt-8 grid ${cols} gap-4">
+              ${items.map(it => {
+                const wrap = cardWrapClass(p.cardStyle);
+                const img = (p.showImages && it.imageUrl) ? `
+                  <div class="overflow-hidden rounded-2xl border border-white/10">
+                    <img src="${esc(it.imageUrl)}" alt="${esc(it.title || "Imagen")}" class="h-40 w-full object-cover" />
+                  </div>
+                ` : "";
+
+                const badge = it.badge ? `
+                  <span class="inline-flex items-center rounded-full bg-indigo-500/15 border border-indigo-400/20 px-3 py-1 text-xs text-indigo-200">
+                    ${esc(it.badge)}
+                  </span>
+                ` : "";
+
+                const btn = (p.showButtons && it.buttonLabel) ? `
+                  <a href="${esc(it.buttonHref || "#")}"
+                     class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 transition">
+                    ${esc(it.buttonLabel)} <span class="opacity-70">→</span>
+                  </a>
+                ` : "";
+
+                return `
+                  <div class="rounded-3xl p-5 ${wrap}">
+                    <div class="flex items-start justify-between">
+                      ${badge}
+                      ${it.subtitle ? `<span class="text-xs text-slate-400">${esc(it.subtitle)}</span>` : ""}
+                    </div>
+
+                    <div class="mt-4 space-y-4">
+                      ${img}
+                      ${it.title ? `<h3 class="text-xl font-semibold tracking-tight">${esc(it.title)}</h3>` : ""}
+                      ${it.text ? `<p class="text-slate-300 leading-relaxed">${esc(it.text)}</p>` : ""}
+                      ${it.smallText ? `<p class="text-xs text-slate-400">${esc(it.smallText)}</p>` : ""}
+                      ${btn ? `<div class="pt-1">${btn}</div>` : ""}
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </section>
+        `;
+      },
+
+      cardHorizontalPro: (p) => {
+        const wrap = cardWrapClass(p.cardStyle);
+        const img = (p.showImage && p.imageUrl) ? `
+          <div class="overflow-hidden rounded-2xl border border-white/10">
+            <img src="${esc(p.imageUrl)}" alt="${esc(p.imageAlt || "Imagen")}" class="h-full w-full object-cover" />
+          </div>
+        ` : "";
+
+        const badge = (p.showBadge && p.badge) ? `
+          <span class="inline-flex items-center rounded-full bg-indigo-500/15 border border-indigo-400/20 px-3 py-1 text-xs text-indigo-200">
+            ${esc(p.badge)}
+          </span>
+        ` : "";
+
+        const btn = p.showButton ? (() => {
+          const target = p.newTab ? ` target="_blank" rel="noopener noreferrer"` : "";
+          return `
+            <a href="${esc(p.buttonHref || "#")}"
+               class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 transition"
+               ${target}>
+              ${esc(p.buttonLabel || "Acción")} <span class="opacity-70">→</span>
+            </a>
+          `;
+        })() : "";
+
+        const content = `
+          <div class="space-y-3">
+            ${badge}
+            ${p.showTitle ? `<h3 class="text-2xl font-semibold tracking-tight">${esc(p.title)}</h3>` : ""}
+            ${p.showSubtitle ? `<p class="text-slate-200/90">${esc(p.subtitle)}</p>` : ""}
+            ${p.showText ? `<p class="text-slate-300 leading-relaxed">${esc(p.text)}</p>` : ""}
+            ${p.showSmallText ? `<p class="text-xs text-slate-400">${esc(p.smallText)}</p>` : ""}
+            ${btn ? `<div class="pt-2">${btn}</div>` : ""}
+          </div>
+        `;
+
+        const imageCol = p.showImage ? `<div class="min-h-[220px]">${img}</div>` : "";
+
+        const grid = `
+          <div class="grid md:grid-cols-2 gap-6 items-stretch">
+            ${p.imageSide === "left" ? imageCol + content : content + imageCol}
+          </div>
+        `;
+
+        return `
+          <section class="max-w-6xl mx-auto px-6 py-10">
+            <div class="rounded-3xl p-6 ${wrap}">
+              ${grid}
+            </div>
+          </section>
+        `;
+      },
+
+      cardFeaturePro: (p) => {
+        const a = alignClass(p.align);
+        const wrap = cardWrapClass(p.cardStyle);
+
+        const sectionId = p.sectionId ? `id="${esc(p.sectionId)}"` : "";
+
+        const hasImg = (p.showImage && p.imageUrl);
+        const bgImg = hasImg ? `
+          <div class="absolute inset-0">
+            <img src="${esc(p.imageUrl)}" alt="${esc(p.imageAlt || "Feature")}" class="h-full w-full object-cover opacity-90" />
+            ${p.overlay ? `<div class="absolute inset-0 bg-slate-950/65"></div>` : ""}
+          </div>
+        ` : "";
+
+        return `
+          <section ${sectionId} class="max-w-6xl mx-auto px-6 py-12">
+            <div class="relative overflow-hidden rounded-3xl p-8 md:p-12 ${wrap}">
+              ${hasImg ? bgImg : ""}
+              <div class="relative flex flex-col gap-3 ${a}">
+                ${p.showTitle ? `<h2 class="text-3xl md:text-4xl font-bold tracking-tight">${esc(p.title)}</h2>` : ""}
+                ${p.showSubtitle ? `<p class="text-slate-200/90 text-lg max-w-3xl">${esc(p.subtitle)}</p>` : ""}
+                ${p.showText ? `<p class="text-slate-300 max-w-3xl leading-relaxed">${esc(p.text)}</p>` : ""}
+                ${p.showButtons ? renderButtons(p.buttons || []) : ""}
+              </div>
+            </div>
+          </section>
+        `;
+        },
+
+        splitMediaPro: (p) => {
+        const sectionId = p.sectionId ? `id="${esc(p.sectionId)}"` : "";
+
+        const isDark = p.bg === "dark";
+        const pageBg = isDark ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900";
+        const subTxt = isDark ? "text-slate-300" : "text-slate-600";
+        const border = isDark ? "border-white/10" : "border-slate-200";
+        const glass = isDark ? "bg-white/5 backdrop-blur-xl" : "bg-slate-50";
+        const elevated = isDark ? "bg-white/5 shadow-xl shadow-black/30" : "bg-white shadow-xl shadow-slate-200/60";
+
+        const wrapStyle =
+            p.cardStyle === "glass" ? glass :
+            p.cardStyle === "elevated" ? elevated :
+            (isDark ? "bg-transparent" : "bg-transparent");
+
+        const py =
+            p.paddingY === "sm" ? "py-8" :
+            p.paddingY === "md" ? "py-12" :
+            "py-16";
+
+        const clip = p.roundedClip
+            ? "rounded-[48px] overflow-hidden"
+            : "rounded-3xl overflow-hidden";
+
+        const image = (p.showImage && p.imageUrl)
+            ? `
+            <div class="${clip} border ${border} ${isDark ? "bg-white/5" : "bg-slate-100"}">
+                <img src="${esc(p.imageUrl)}" alt="${esc(p.imageAlt || "Imagen")}"
+                    class="w-full h-full object-cover min-h-[280px] md:min-h-[360px]" />
+            </div>
+            `
+            : "";
+
+        const eyebrow = (p.showEyebrow && p.eyebrow)
+            ? `<div class="${isDark ? "text-indigo-200/90" : "text-indigo-600"} text-sm font-semibold tracking-wide">${esc(p.eyebrow)}</div>`
+            : "";
+
+        const title = p.showTitle ? `<h2 class="text-3xl md:text-5xl font-bold leading-tight tracking-tight">${esc(p.title)}</h2>` : "";
+        const subtitle = p.showSubtitle ? `<p class="text-lg md:text-xl ${subTxt}">${esc(p.subtitle)}</p>` : "";
+        const text = p.showText ? `<p class="${subTxt} leading-relaxed">${esc(p.text)}</p>` : "";
+
+        const buttons = p.showButtons ? renderButtons(p.buttons || []) : "";
+
+        const content = `
+            <div class="space-y-4">
+            ${eyebrow}
+            ${title}
+            ${subtitle}
+            ${text}
+            ${buttons}
+            </div>
+        `;
+
+        const grid = `
+            <div class="grid md:grid-cols-2 gap-8 items-center">
+            ${p.imageSide === "left" ? `${image}${content}` : `${content}${image}`}
+            </div>
+        `;
+
+        return `
+            <section ${sectionId} class="${pageBg}">
+            <div class="max-w-6xl mx-auto px-6 ${py}">
+                <div class="rounded-3xl border ${border} ${wrapStyle} p-6 md:p-10">
+                ${grid}
+                </div>
+            </div>
+            </section>
+        `;
+        }
+
     };
 
-    function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, s => ({
-        "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
-      }[s]));
-    }
-
     async function main() {
-      const res = await fetch("/api/site");
-      const site = await res.json();
-
+      const site = await fetch("/api/site").then(r => r.json());
       document.title = site.meta?.title || "Mi sitio";
 
-      const html = (site.sections || [])
-        .map(sec => {
-          const fn = renderers[sec.type];
-          return fn ? fn(sec.props || {}) : "";
-        })
-        .join("");
+      const html = (site.sections || []).map(sec => {
+        const fn = renderers[sec.type];
+        return fn ? fn(sec.props || {}) : "";
+      }).join("");
 
-      document.getElementById("app").innerHTML =
-        html || `<div class="container"><h2>No hay bloques publicados</h2><p>Entra a <b>/admin</b>, agrega bloques y presiona <b>Publicar</b>.</p></div>`;
+      document.getElementById("app").innerHTML = html || `
+        <div class="min-h-screen grid place-items-center px-6">
+          <div class="max-w-lg text-center">
+            <div class="text-2xl font-semibold">No hay bloques publicados</div>
+            <p class="text-slate-300 mt-2">Entra a <b>/admin</b>, agrega bloques y presiona <b>Publicar</b>.</p>
+          </div>
+        </div>
+      `;
     }
 
     main().catch(err => {
-      document.getElementById("app").innerHTML =
-        `<div class="container"><h2>Error renderizando</h2><pre>${err}</pre></div>`;
+      document.getElementById("app").innerHTML = `
+        <pre class="p-6 text-red-200 whitespace-pre-wrap">${esc(err?.stack || err)}</pre>
+      `;
       console.error(err);
     });
   </script>

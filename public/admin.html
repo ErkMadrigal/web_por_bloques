@@ -1,39 +1,56 @@
 <!doctype html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Admin</title>
-  <style>
-    body { font-family: Arial; margin:0; display:flex; height:100vh; }
-    .left { width:280px; border-right:1px solid #ddd; padding:12px; overflow:auto; }
-    .mid { flex:1; padding:12px; overflow:auto; }
-    button { padding:8px 10px; margin:4px 0; width:100%; }
-    .sec { border:1px solid #ddd; border-radius:10px; padding:10px; margin-bottom:8px; }
-  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Builder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="left">
-    <h3>Bloques</h3>
-    <div id="blocks"></div>
-    <hr>
-    <button id="save">Guardar (draft)</button>
-    <button id="publish">Publicar</button>
-    <p style="font-size:12px;color:#666">Después de publicar, ve a <b>/</b></p>
-  </div>
 
-  <div class="mid">
-    <h3>Secciones</h3>
-    <div id="sections"></div>
+<body class="bg-slate-950 text-slate-100">
+  <div class="h-screen grid grid-cols-12">
+    <!-- Left -->
+    <aside class="col-span-3 border-r border-white/10 p-4 overflow-auto">
+      <div class="text-lg font-semibold">Bloques</div>
+      <div id="blocks" class="mt-3 space-y-2"></div>
+
+      <div class="mt-6 grid grid-cols-2 gap-2">
+        <button id="save" class="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2">Guardar</button>
+        <button id="publish" class="rounded-xl bg-indigo-500 hover:bg-indigo-400 px-3 py-2 font-medium">Publicar</button>
+      </div>
+
+      <p class="text-xs text-slate-400 mt-3">
+        Vista pública en <b>/</b>
+      </p>
+    </aside>
+
+    <!-- Middle -->
+    <main class="col-span-5 p-4 overflow-auto">
+      <div class="text-lg font-semibold">Secciones</div>
+      <div id="sections" class="mt-3 space-y-3"></div>
+    </main>
+
+    <!-- Right -->
+    <section class="col-span-4 border-l border-white/10 p-4 overflow-auto">
+      <div class="text-lg font-semibold">Propiedades</div>
+      <div id="selected" class="text-sm text-slate-300 mt-1">Selecciona un bloque</div>
+      <div id="form" class="mt-4 space-y-4"></div>
+    </section>
   </div>
 
   <script>
     let registry = [];
     let draft = null;
+    let selectedId = null;
 
-    const elBlocks = document.getElementById("blocks");
-    const elSections = document.getElementById("sections");
+    const $blocks = document.getElementById("blocks");
+    const $sections = document.getElementById("sections");
+    const $form = document.getElementById("form");
+    const $selected = document.getElementById("selected");
 
-    function uid(){ return "s" + Math.random().toString(16).slice(2); }
+    const uid = () => "s" + Math.random().toString(16).slice(2);
+    const deepClone = (o) => (structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
+    const getDef = (type) => registry.find(b => b.type === type);
 
     async function load() {
       registry = await fetch("/api/admin/blocks").then(r => r.json());
@@ -43,48 +60,358 @@
     }
 
     function renderBlocks() {
-      elBlocks.innerHTML = "";
+      $blocks.innerHTML = "";
       registry.forEach(b => {
         const btn = document.createElement("button");
-        btn.textContent = "➕ " + b.name;
+        btn.className = "w-full text-left rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-3 transition";
+        btn.innerHTML = `<div class="font-medium">${b.name}</div><div class="text-xs text-slate-400">${b.type}</div>`;
         btn.onclick = () => {
-          draft.sections.push({ id: uid(), type: b.type, props: structuredClone(b.defaultProps) });
+          draft.sections.push({ id: uid(), type: b.type, props: deepClone(b.defaultProps) });
           renderSections();
         };
-        elBlocks.appendChild(btn);
+        $blocks.appendChild(btn);
       });
     }
 
+    function moveSection(idx, dir) {
+      const j = idx + dir;
+      if (j < 0 || j >= draft.sections.length) return;
+      [draft.sections[idx], draft.sections[j]] = [draft.sections[j], draft.sections[idx]];
+      renderSections();
+    }
+
+    function selectSection(id) {
+      selectedId = id;
+      const sec = draft.sections.find(s => s.id === id);
+      $selected.innerHTML = `<b class="text-slate-100">${sec.type}</b> <span class="text-slate-400">(${sec.id})</span>`;
+      renderForm(sec);
+      renderSections();
+    }
+
     function renderSections() {
-      elSections.innerHTML = "";
-      draft.sections.forEach((s, i) => {
+      $sections.innerHTML = "";
+      draft.sections.forEach((s, idx) => {
+        const active = s.id === selectedId;
         const div = document.createElement("div");
-        div.className = "sec";
+        div.className = `rounded-2xl border ${active ? "border-indigo-400/40 bg-indigo-500/10" : "border-white/10 bg-white/5"} p-4`;
+
         div.innerHTML = `
-          <b>${i+1}. ${s.type}</b>
-          <pre style="white-space:pre-wrap">${JSON.stringify(s.props, null, 2)}</pre>
-          <button data-del>Eliminar</button>
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="font-semibold">${idx+1}. ${s.type}</div>
+              <div class="text-xs text-slate-400">${s.id}</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1" data-act="up">↑</button>
+              <button class="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1" data-act="down">↓</button>
+              <button class="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-1" data-act="edit">Editar</button>
+              <button class="rounded-lg bg-red-500/15 hover:bg-red-500/20 border border-red-400/20 px-2 py-1" data-act="del">Eliminar</button>
+            </div>
+          </div>
         `;
-        div.querySelector("[data-del]").onclick = () => {
+
+        div.querySelector('[data-act="edit"]').onclick = () => selectSection(s.id);
+        div.querySelector('[data-act="up"]').onclick = () => moveSection(idx, -1);
+        div.querySelector('[data-act="down"]').onclick = () => moveSection(idx, 1);
+        div.querySelector('[data-act="del"]').onclick = () => {
           draft.sections = draft.sections.filter(x => x.id !== s.id);
+          if (selectedId === s.id) {
+            selectedId = null;
+            $selected.textContent = "Selecciona un bloque";
+            $form.innerHTML = "";
+          }
           renderSections();
         };
-        elSections.appendChild(div);
+
+        $sections.appendChild(div);
       });
+    }
+
+    function shouldShow(field, props) {
+      if (!field.dependsOn) return true;
+      return !!props[field.dependsOn];
+    }
+
+    function inputBase(label, inner) {
+      return `
+        <label class="block">
+          <div class="text-sm text-slate-200 mb-1">${label}</div>
+          ${inner}
+        </label>
+      `;
+    }
+
+    function renderButtonsEditor(sec, key) {
+      const arr = Array.isArray(sec.props[key]) ? sec.props[key] : (sec.props[key] = []);
+      const wrap = document.createElement("div");
+      wrap.className = "space-y-3";
+
+      const list = document.createElement("div");
+      list.className = "space-y-2";
+
+      function renderList() {
+        list.innerHTML = "";
+        arr.forEach((b, idx) => {
+          const row = document.createElement("div");
+          row.className = "rounded-xl border border-white/10 bg-white/5 p-3 space-y-2";
+
+          row.innerHTML = `
+            <div class="grid grid-cols-2 gap-2">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2"
+                     placeholder="Label" value="${b.label ?? ""}" data-k="label">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2"
+                     placeholder="Href (ej #contacto o https://...)" value="${b.href ?? ""}" data-k="href">
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 items-center">
+              <select class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" data-k="variant">
+                <option value="primary" ${b.variant==="primary"?"selected":""}>primary</option>
+                <option value="ghost" ${b.variant==="ghost"?"selected":""}>ghost</option>
+              </select>
+
+              <label class="flex items-center gap-2 text-sm text-slate-200">
+                <input type="checkbox" ${b.newTab ? "checked":""} data-k="newTab">
+                Nueva pestaña
+              </label>
+
+              <button class="rounded-xl bg-red-500/15 hover:bg-red-500/20 border border-red-400/20 px-3 py-2"
+                      data-del="${idx}">
+                Quitar
+              </button>
+            </div>
+          `;
+
+          row.querySelectorAll("[data-k]").forEach(el => {
+            const k = el.getAttribute("data-k");
+            const sync = () => {
+              if (el.type === "checkbox") b[k] = el.checked;
+              else b[k] = el.value;
+            };
+            el.addEventListener("input", sync);
+            el.addEventListener("change", sync);
+          });
+
+          row.querySelector(`[data-del="${idx}"]`).onclick = () => {
+            arr.splice(idx, 1);
+            renderList();
+          };
+
+          list.appendChild(row);
+        });
+      }
+
+      const addBtn = document.createElement("button");
+      addBtn.className = "w-full rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2";
+      addBtn.textContent = "➕ Agregar botón";
+      addBtn.onclick = () => {
+        arr.push({ label: "Nuevo botón", href: "#", variant: "primary", newTab: false });
+        renderList();
+      };
+
+      renderList();
+      wrap.appendChild(list);
+      wrap.appendChild(addBtn);
+      return wrap;
+    }
+
+    function renderCardsListEditor(sec, key) {
+      const arr = Array.isArray(sec.props[key]) ? sec.props[key] : (sec.props[key] = []);
+      const wrap = document.createElement("div");
+      wrap.className = "space-y-3";
+
+      const list = document.createElement("div");
+      list.className = "space-y-2";
+
+      function renderList() {
+        list.innerHTML = "";
+        arr.forEach((c, idx) => {
+          const row = document.createElement("div");
+          row.className = "rounded-xl border border-white/10 bg-white/5 p-3 space-y-2";
+
+          row.innerHTML = `
+            <div class="grid grid-cols-2 gap-2">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="Badge" value="${c.badge ?? ""}" data-k="badge">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="Título" value="${c.title ?? ""}" data-k="title">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="Subtítulo" value="${c.subtitle ?? ""}" data-k="subtitle">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="Texto chico" value="${c.smallText ?? ""}" data-k="smallText">
+            </div>
+
+            <textarea class="w-full min-h-[80px] rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="Descripción" data-k="text">${c.text ?? ""}</textarea>
+
+            <div class="grid grid-cols-2 gap-2">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="URL imagen" value="${c.imageUrl ?? ""}" data-k="imageUrl">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="Botón label" value="${c.buttonLabel ?? ""}" data-k="buttonLabel">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <input class="w-full rounded-xl bg-slate-900 border border-white/10 px-3 py-2" placeholder="Botón href" value="${c.buttonHref ?? ""}" data-k="buttonHref">
+              <button class="rounded-xl bg-red-500/15 hover:bg-red-500/20 border border-red-400/20 px-3 py-2" data-del="${idx}">
+                Eliminar card
+              </button>
+            </div>
+
+            <div class="flex gap-2">
+              <button class="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2" data-up="${idx}">↑</button>
+              <button class="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2" data-down="${idx}">↓</button>
+            </div>
+          `;
+
+          row.querySelectorAll("[data-k]").forEach(el => {
+            const k = el.getAttribute("data-k");
+            const sync = () => { c[k] = el.value; };
+            el.addEventListener("input", sync);
+            el.addEventListener("change", sync);
+          });
+
+          row.querySelector(`[data-del="${idx}"]`).onclick = () => {
+            arr.splice(idx, 1);
+            renderList();
+          };
+
+          row.querySelector(`[data-up="${idx}"]`).onclick = () => {
+            if (idx === 0) return;
+            [arr[idx-1], arr[idx]] = [arr[idx], arr[idx-1]];
+            renderList();
+          };
+
+          row.querySelector(`[data-down="${idx}"]`).onclick = () => {
+            if (idx === arr.length - 1) return;
+            [arr[idx+1], arr[idx]] = [arr[idx], arr[idx+1]];
+            renderList();
+          };
+
+          list.appendChild(row);
+        });
+      }
+
+      const addBtn = document.createElement("button");
+      addBtn.className = "w-full rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2";
+      addBtn.textContent = "➕ Agregar card";
+      addBtn.onclick = () => {
+        arr.push({
+          badge: "Nuevo",
+          title: "Nueva card",
+          subtitle: "Sub",
+          text: "Descripción",
+          smallText: "",
+          imageUrl: "",
+          buttonLabel: "Ver",
+          buttonHref: "#"
+        });
+        renderList();
+      };
+
+      renderList();
+      wrap.appendChild(list);
+      wrap.appendChild(addBtn);
+      return wrap;
+    }
+
+    function renderForm(sec) {
+      $form.innerHTML = "";
+      const def = getDef(sec.type);
+      if (!def?.schema) {
+        $form.innerHTML = `<div class="text-slate-300 text-sm">Este bloque no tiene schema.</div>`;
+        return;
+      }
+
+      def.schema.forEach(field => {
+        if (!shouldShow(field, sec.props)) return;
+
+        const key = field.key;
+
+        if (field.input === "toggle") {
+          const el = document.createElement("div");
+          el.innerHTML = inputBase(field.label, `
+            <label class="flex items-center gap-3">
+              <input type="checkbox" class="h-5 w-5" ${sec.props[key] ? "checked":""}>
+              <span class="text-sm text-slate-300">${sec.props[key] ? "Sí" : "No"}</span>
+            </label>
+          `);
+
+          const chk = el.querySelector("input[type=checkbox]");
+          chk.onchange = () => {
+            sec.props[key] = chk.checked;
+            renderForm(sec);
+          };
+          $form.appendChild(el);
+          return;
+        }
+
+        if (field.input === "text") {
+          const el = document.createElement("div");
+          el.innerHTML = inputBase(field.label, `
+            <input class="w-full rounded-2xl bg-slate-900 border border-white/10 px-3 py-2 outline-none focus:border-indigo-400/40"
+                   value="${sec.props[key] ?? ""}">
+          `);
+          const inp = el.querySelector("input");
+          inp.oninput = () => sec.props[key] = inp.value;
+          $form.appendChild(el);
+          return;
+        }
+
+        if (field.input === "textarea") {
+          const el = document.createElement("div");
+          el.innerHTML = inputBase(field.label, `
+            <textarea class="w-full min-h-[120px] rounded-2xl bg-slate-900 border border-white/10 px-3 py-2 outline-none focus:border-indigo-400/40">${sec.props[key] ?? ""}</textarea>
+          `);
+          const ta = el.querySelector("textarea");
+          ta.oninput = () => sec.props[key] = ta.value;
+          $form.appendChild(el);
+          return;
+        }
+
+        if (field.input === "select") {
+          const el = document.createElement("div");
+          el.innerHTML = inputBase(field.label, `
+            <select class="w-full rounded-2xl bg-slate-900 border border-white/10 px-3 py-2 outline-none focus:border-indigo-400/40">
+              ${(field.options || []).map(opt => `<option value="${opt}" ${sec.props[key]===opt?"selected":""}>${opt}</option>`).join("")}
+            </select>
+          `);
+          const sel = el.querySelector("select");
+          sel.onchange = () => sec.props[key] = sel.value;
+          $form.appendChild(el);
+          return;
+        }
+
+        if (field.input === "buttons") {
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = `<div class="text-sm text-slate-200 mb-2">${field.label}</div>`;
+          wrapper.appendChild(renderButtonsEditor(sec, key));
+          $form.appendChild(wrapper);
+          return;
+        }
+
+        if (field.input === "cardsList") {
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = `<div class="text-sm text-slate-200 mb-2">${field.label}</div>`;
+          wrapper.appendChild(renderCardsListEditor(sec, key));
+          $form.appendChild(wrapper);
+          return;
+        }
+      });
+
+      const hint = document.createElement("div");
+      hint.className = "text-xs text-slate-400 pt-2 border-t border-white/10";
+      hint.innerHTML = `Tip: Guarda y luego Publica.`;
+      $form.appendChild(hint);
     }
 
     document.getElementById("save").onclick = async () => {
       await fetch("/api/admin/site/save", {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(draft)
       });
-      alert("Guardado ✅");
+      alert("Guardado (draft) ✅");
     };
 
     document.getElementById("publish").onclick = async () => {
       await fetch("/api/admin/site/publish", { method: "POST" });
-      alert("Publicado ✅ (abre /)");
+      alert("Publicado ✅ (revisa /)");
     };
 
     load().catch(console.error);
