@@ -1,0 +1,51 @@
+# -----------------------------
+# Node / npm
+# -----------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -----------------------------
+# Environment variables
+# -----------------------------
+.env
+.env.local
+.env.*.local
+
+# -----------------------------
+# OS / Editor
+# -----------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# -----------------------------
+# Build / cache
+# -----------------------------
+dist/
+build/
+.cache/
+
+# -----------------------------
+# Runtime
+# -----------------------------
+logs/
+*.log
+
+# -----------------------------
+# Builder content (MUY IMPORTANTE)
+# NO subir contenido del cliente
+# -----------------------------
+data/*.json
+
+# Pero conservar la carpeta
+!data/.gitkeep
+
+# -----------------------------
+# Uploads (si luego agregas imágenes)
+# -----------------------------
+public/uploads/
